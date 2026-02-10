@@ -1,0 +1,11 @@
+node_modules/
+frontend/node_modules/
+server/node_modules/
+.env
+.env.*
+server/.env
+*.log
+dist/
+frontend/dist/
+frontend/.vite/
+.cursor

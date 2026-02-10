@@ -71,6 +71,9 @@ async function initSchema(p) {
     WHERE recruiter_id IS NULL
   `).catch(() => {});
   await p.query(`
+    ALTER TABLE applications ADD COLUMN IF NOT EXISTS accepted_at TIMESTAMPTZ;
+  `).catch(() => {});
+  await p.query(`
     ALTER TABLE messages ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
   `).catch(() => {});
   await p.query(`

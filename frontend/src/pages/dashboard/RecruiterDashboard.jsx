@@ -342,7 +342,7 @@ export function RecruiterDashboard() {
           <div className="recruiter-stat-card">
             <div>
               <div className="recruiter-stat-label">Placements confirmés</div>
-              <div className="recruiter-stat-value">0</div>
+              <div className="recruiter-stat-value">{applications.filter((app) => app.status === "accepted").length}</div>
             </div>
             <div className="recruiter-stat-icon" style={{ border: "1px solid rgba(56,189,248,0.7)" }}>
               <CheckCircle2 size={18} color="#38bdf8" />

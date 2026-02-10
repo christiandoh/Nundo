@@ -20,7 +20,8 @@ function rowToApp(row) {
     workerMainSkill: row.worker_main_skill || "",
     workerAvatarUrl: row.worker_avatar_url || null,
     status: row.status || "pending",
-    createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString()
+    createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
+    acceptedAt: row.accepted_at ? new Date(row.accepted_at).toISOString() : null
   };
 }
 
@@ -41,21 +42,46 @@ function rowToMessage(row) {
   };
 }
 
+// Après acceptation d'un candidat pour un poste, les autres postulants (pending) du même poste
+// disparaissent de la liste du recruteur au bout de 10 min.
+const HIDE_PENDING_AFTER_ACCEPT_MS = 10 * 60 * 1000;
+
 router.get("/", async (req, res, next) => {
   try {
     if (pool) {
       const result = await pool.query(
-        `SELECT id, job_id, worker_id, message, worker_name, worker_main_skill, worker_avatar_url, status, created_at
-         FROM applications ORDER BY id DESC`
+        `SELECT a.id, a.job_id, a.worker_id, a.message, a.worker_name, a.worker_main_skill, a.worker_avatar_url, a.status, a.created_at, a.accepted_at
+         FROM applications a
+         WHERE a.status = 'accepted'
+            OR NOT EXISTS (
+              SELECT 1 FROM applications b
+              WHERE b.job_id = a.job_id AND b.status = 'accepted'
+                AND b.accepted_at IS NOT NULL
+                AND b.accepted_at < NOW() - INTERVAL '10 minutes'
+            )
+         ORDER BY a.id DESC`
       );
       return res.json(result.rows.map(rowToApp));
     }
-    res.json(applicationsMem.map((a) => ({
+    const cutoff = new Date(Date.now() - HIDE_PENDING_AFTER_ACCEPT_MS).toISOString();
+    const jobIdsWithOldAccept = new Set();
+    applicationsMem.forEach((a) => {
+      if (a.status === "accepted" && a.acceptedAt && a.acceptedAt <= cutoff) {
+        jobIdsWithOldAccept.add(a.jobId);
+      }
+    });
+    const filtered = applicationsMem.filter((a) => {
+      if (a.status === "accepted") return true;
+      if (a.status !== "pending") return true;
+      return !jobIdsWithOldAccept.has(a.jobId);
+    });
+    res.json(filtered.map((a) => ({
       ...a,
       jobId: a.jobId,
       workerId: a.workerId,
       workerName: a.workerName,
-      workerMainSkill: a.workerMainSkill
+      workerMainSkill: a.workerMainSkill,
+      acceptedAt: a.acceptedAt ?? null
     })));
   } catch (err) {
     next(err);
@@ -242,8 +268,8 @@ router.post("/:id/accept", async (req, res, next) => {
     let app = null;
     if (pool) {
       const result = await pool.query(
-        `UPDATE applications SET status = 'accepted' WHERE id = $1
-         RETURNING id, job_id, worker_id, message, worker_name, worker_main_skill, status, created_at`,
+        `UPDATE applications SET status = 'accepted', accepted_at = NOW() WHERE id = $1
+         RETURNING id, job_id, worker_id, message, worker_name, worker_main_skill, status, created_at, accepted_at`,
         [id]
       );
       app = result.rows[0] ? rowToApp(result.rows[0]) : null;
@@ -259,9 +285,10 @@ router.post("/:id/accept", async (req, res, next) => {
         return res.status(404).json({ message: "Candidature introuvable." });
       }
       a.status = "accepted";
+      a.acceptedAt = new Date().toISOString();
       const jobMem = jobsMem.find((j) => j.id === a.jobId);
       if (jobMem) jobMem.status = "closed";
-      app = { ...a, jobId: a.jobId, workerId: a.workerId };
+      app = { ...a, jobId: a.jobId, workerId: a.workerId, acceptedAt: a.acceptedAt };
     }
     // Notification temps réel au travailleur
     try {

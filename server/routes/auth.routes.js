@@ -32,6 +32,35 @@ function toUserRow(row) {
 const usersMem = [];
 let nextIdMem = 1;
 
+const INIT_ADMIN_PHONE_MEM = process.env.INIT_ADMIN_PHONE || "0711118582";
+const INIT_ADMIN_NAME_MEM = process.env.INIT_ADMIN_NAME || "doh lah";
+const INIT_ADMIN_PASSWORD_MEM = process.env.INIT_ADMIN_PASSWORD || "Hacker@117";
+
+export async function ensureAdminMem() {
+  if (pool) return;
+  if (usersMem.some((u) => u.phone === INIT_ADMIN_PHONE_MEM)) return;
+  const passwordHash = await bcrypt.hash(INIT_ADMIN_PASSWORD_MEM, 10);
+  usersMem.push({
+    id: nextIdMem++,
+    phone: INIT_ADMIN_PHONE_MEM,
+    role: "admin",
+    passwordHash,
+    profile: { fullName: INIT_ADMIN_NAME_MEM },
+    created_at: new Date().toISOString()
+  });
+  console.log("[NUNDO] Compte admin (mémoire) créé pour", INIT_ADMIN_PHONE_MEM);
+}
+
+export function getUsersForAdmin() {
+  return usersMem.map((u) => ({
+    id: u.id,
+    phone: u.phone,
+    role: u.role,
+    profile: u.profile || {},
+    created_at: u.created_at || null
+  }));
+}
+
 router.post("/register", async (req, res, next) => {
   try {
     const {
@@ -46,6 +75,10 @@ router.post("/register", async (req, res, next) => {
 
     if (!phone || !password) {
       return res.status(400).json({ message: "Téléphone et mot de passe requis." });
+    }
+
+    if (role === "admin") {
+      return res.status(403).json({ message: "Création de compte admin non autorisée." });
     }
 
     const profile =
@@ -90,7 +123,8 @@ router.post("/register", async (req, res, next) => {
       phone,
       role,
       passwordHash,
-      profile
+      profile,
+      created_at: new Date().toISOString()
     };
     usersMem.push(user);
     const token = signToken({ id: user.id, phone: user.phone, role: user.role });

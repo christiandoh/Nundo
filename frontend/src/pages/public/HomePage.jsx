@@ -1,10 +1,12 @@
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import heroImage from "@/pages/assets/image.png";
 
 export function HomePage() {
   const navigate = useNavigate();
   return (
-    <section
+    <>
+      <section
       style={{
         display: "grid",
         gridTemplateColumns: "minmax(0, 1.3fr) minmax(0, 1fr)",
@@ -207,6 +209,46 @@ export function HomePage() {
         </div>
       </motion.div>
     </section>
+
+      <motion.section
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.25, duration: 0.5 }}
+        style={{ marginTop: "3rem" }}
+      >
+        <div
+          style={{
+            borderRadius: 28,
+            overflow: "hidden",
+            boxShadow: "0 24px 60px rgba(15,23,42,0.22)"
+          }}
+        >
+          <img
+            src={heroImage}
+            alt="Travailleur satisfait grâce à NUNDO"
+            style={{ width: "100%", height: "auto", display: "block" }}
+          />
+        </div>
+
+        <div
+          style={{
+            marginTop: "1.4rem",
+            maxWidth: 700,
+            fontSize: 14,
+            color: "#4b5563"
+          }}
+        >
+          NUNDO simplifie le recrutement de{" "}
+          <span style={{ color: "#f77f00", fontWeight: 600 }}>talents locaux</span> en te
+          présentant des{" "}
+          <span style={{ color: "#f77f00", fontWeight: 600 }}>travailleurs de confiance</span>,
+          vérifiés et prêts à commencer rapidement. Gagne du temps sur la sélection, sécurise tes{" "}
+          <span style={{ color: "#f77f00", fontWeight: 600 }}>placements</span> et paie en toute
+          sérénité via{" "}
+          <span style={{ color: "#f77f00", fontWeight: 600 }}>Mobile Money</span>.
+        </div>
+      </motion.section>
+    </>
   );
 }
 

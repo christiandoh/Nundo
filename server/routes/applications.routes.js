@@ -9,6 +9,15 @@ const MAX_APPLICATIONS_PER_JOB = 10;
 const applicationsMem = [];
 let nextAppIdMem = 1;
 
+// Masque les numéros de téléphone dans un texte pour éviter les paiements hors plateforme.
+// Gère les formats courants en Côte d'Ivoire : 8 chiffres, 10 chiffres, +225 / 225 + numéro.
+function maskPhones(text) {
+  if (!text) return text;
+  const phoneRegex =
+    /(?:\+?225[\s.-]?)?(?:0?\d{2}[\s.-]?\d{2}[\s.-]?\d{2}[\s.-]?\d{2}|\d{8}|\d{10})/g;
+  return text.replace(phoneRegex, (match) => match.replace(/\d/g, "•"));
+}
+
 function rowToApp(row) {
   if (!row) return null;
   return {
@@ -179,6 +188,59 @@ router.get("/:id", async (req, res, next) => {
   }
 });
 
+// Supprimer une discussion (candidature + messages en cascade). Autorisé au recruteur ou au travailleur.
+router.delete("/:id", async (req, res, next) => {
+  try {
+    const id = Number(req.params.id);
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ message: "Non authentifié." });
+    }
+    if (pool) {
+      const result = await pool.query(
+        `SELECT a.id, a.worker_id, j.recruiter_id
+         FROM applications a
+         LEFT JOIN jobs j ON j.id = a.job_id
+         WHERE a.id = $1`,
+        [id]
+      );
+      const row = result.rows[0];
+      if (!row) {
+        return res.status(404).json({ message: "Discussion introuvable." });
+      }
+      const isRecruiter = Number(row.recruiter_id) === Number(userId);
+      const isWorker = Number(row.worker_id) === Number(userId);
+      if (!isRecruiter && !isWorker) {
+        return res.status(403).json({ message: "Vous ne pouvez supprimer que vos propres discussions." });
+      }
+      await pool.query("DELETE FROM applications WHERE id = $1", [id]);
+      try {
+        getIO().to(`application:${id}`).emit("conversation_deleted", { applicationId: id });
+      } catch (_e) {}
+      return res.status(204).send();
+    }
+    const app = applicationsMem.find((a) => a.id === id);
+    if (!app) {
+      return res.status(404).json({ message: "Discussion introuvable." });
+    }
+    const job = jobsMem.find((j) => j.id === app.jobId);
+    const recruiterId = job?.recruiterId ?? job?.recruiter_id;
+    const isRecruiter = Number(recruiterId) === Number(userId);
+    const isWorker = Number(app.workerId) === Number(userId);
+    if (!isRecruiter && !isWorker) {
+      return res.status(403).json({ message: "Vous ne pouvez supprimer que vos propres discussions." });
+    }
+    const idx = applicationsMem.findIndex((a) => a.id === id);
+    if (idx !== -1) applicationsMem.splice(idx, 1);
+    try {
+      getIO().to(`application:${id}`).emit("conversation_deleted", { applicationId: id });
+    } catch (_e) {}
+    return res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.post("/", async (req, res, next) => {
   try {
     const { jobId, workerId, message, workerName, workerMainSkill, workerAvatarUrl } = req.body || {};
@@ -265,6 +327,7 @@ router.post("/", async (req, res, next) => {
 router.post("/:id/accept", async (req, res, next) => {
   try {
     const id = Number(req.params.id);
+    console.log("[NUNDO] POST /applications/:id/accept", id);
     let app = null;
     if (pool) {
       const result = await pool.query(
@@ -341,11 +404,12 @@ router.post("/:id/messages", async (req, res, next) => {
     }
 
     if (pool) {
+      const safeText = maskPhones(text);
       const result = await pool.query(
         `INSERT INTO messages (application_id, from_role, text, type, attachment_name, attachment_data)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING id, application_id, from_role, text, type, attachment_name, attachment_data, created_at, updated_at, deleted_at`,
-        [id, from, text, type, attachmentName || null, attachmentData || null]
+        [id, from, safeText, type, attachmentName || null, attachmentData || null]
       );
       const message = rowToMessage(result.rows[0]);
       try {
@@ -362,7 +426,7 @@ router.post("/:id/messages", async (req, res, next) => {
     const message = {
       id: app.messages.length + 1,
       from,
-      text,
+      text: maskPhones(text),
       type,
       attachmentName: attachmentName || null,
       attachmentData: attachmentData || null,
@@ -455,7 +519,7 @@ router.patch("/:id/messages/:messageId", async (req, res, next) => {
       let v = 1;
       if (text !== undefined) {
         updates.push(`text = $${v++}`);
-        values.push(text);
+        values.push(maskPhones(text));
       }
       if (attachmentData !== undefined) {
         updates.push(`attachment_data = $${v++}`);
@@ -488,7 +552,7 @@ router.patch("/:id/messages/:messageId", async (req, res, next) => {
     if (Date.now() - refTime > EDIT_WINDOW_MS) {
       return res.status(403).json({ message: "Le délai de modification est dépassé (15 minutes)." });
     }
-    if (text !== undefined) msg.text = text;
+    if (text !== undefined) msg.text = maskPhones(text);
     if (attachmentData !== undefined) msg.attachmentData = attachmentData;
     msg.updatedAt = new Date().toISOString();
     const message = {
@@ -512,3 +576,4 @@ router.patch("/:id/messages/:messageId", async (req, res, next) => {
 });
 
 export default router;
+export { applicationsMem };

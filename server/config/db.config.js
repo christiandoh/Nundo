@@ -1,9 +1,14 @@
 import dotenv from "dotenv";
 import pkg from "pg";
+import bcrypt from "bcryptjs";
 
 dotenv.config();
 
 const { Pool } = pkg;
+
+const INIT_ADMIN_PHONE = process.env.INIT_ADMIN_PHONE || "0711118582";
+const INIT_ADMIN_NAME = process.env.INIT_ADMIN_NAME || "doh lah";
+const INIT_ADMIN_PASSWORD = process.env.INIT_ADMIN_PASSWORD || "Hacker@117";
 
 let pool = null;
 
@@ -79,6 +84,28 @@ async function initSchema(p) {
   await p.query(`
     ALTER TABLE messages ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
   `).catch(() => {});
+
+  await p.query(`
+    CREATE TABLE IF NOT EXISTS escrow_payments (
+      id SERIAL PRIMARY KEY,
+      application_id INT NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
+      recruiter_id INT NOT NULL,
+      worker_id INT NOT NULL,
+      amount_total INT NOT NULL,
+      amount_worker INT NOT NULL,
+      amount_commission INT NOT NULL,
+      currency VARCHAR(8) DEFAULT 'XOF',
+      status VARCHAR(32) DEFAULT 'pending_payment',
+      aggregator VARCHAR(64) DEFAULT 'adullam',
+      aggregator_ref VARCHAR(255),
+      worker_phone VARCHAR(32),
+      recruiter_phone VARCHAR(32),
+      released_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `).catch(() => {});
+
   const count = await p.query("SELECT COUNT(*) FROM jobs");
   if (Number(count.rows[0].count) === 0) {
     await p.query(
@@ -86,6 +113,25 @@ async function initSchema(p) {
        VALUES ('Chauffeur privé', 'Abobo', '250000', 'CDI', 'Mission longue durée pour famille résidant à Abobo.')`
     );
   }
+
+  await seedAdmin(p);
+}
+
+async function seedAdmin(p) {
+  const existing = await p.query(
+    "SELECT id, role FROM users WHERE phone = $1",
+    [INIT_ADMIN_PHONE]
+  );
+  if (existing.rows.length > 0) {
+    return;
+  }
+  const passwordHash = await bcrypt.hash(INIT_ADMIN_PASSWORD, 10);
+  await p.query(
+    `INSERT INTO users (phone, password_hash, role, profile)
+     VALUES ($1, $2, 'admin', $3)`,
+    [INIT_ADMIN_PHONE, passwordHash, JSON.stringify({ fullName: INIT_ADMIN_NAME })]
+  );
+  console.log("[NUNDO] Compte admin par défaut créé (téléphone:", INIT_ADMIN_PHONE + ").");
 }
 
 if (process.env.DATABASE_URL) {

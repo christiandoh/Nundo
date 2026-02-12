@@ -28,7 +28,10 @@ export function LoginPage() {
         throw new Error(data.message || "Impossible de se connecter.");
       }
       saveAuth(data.token, data.user);
-      navigate(data.user?.role === "recruiter" ? "/dashboard/recruiter" : "/dashboard/worker");
+      const role = data.user?.role;
+      if (role === "admin") navigate("/dashboard/admin");
+      else if (role === "recruiter") navigate("/dashboard/recruiter");
+      else navigate("/dashboard/worker");
     } catch (err) {
       setError(err.message);
     } finally {

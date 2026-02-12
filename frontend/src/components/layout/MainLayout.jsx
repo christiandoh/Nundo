@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { MessageCircle, LayoutDashboard, LogOut, Briefcase, Mail } from "lucide-react";
+import { MessageCircle, LayoutDashboard, LogOut, Briefcase, Mail, Shield } from "lucide-react";
 import { useAuth } from "@/context/AuthContext.jsx";
+import logo from "@/pages/assets/logo2.png";
 
 const API_BASE = "http://localhost:4000";
 const pageVariants = {
@@ -50,11 +51,12 @@ export function MainLayout({ children }) {
       <header className="main-nav">
         <div className="main-nav-inner">
           <Link to="/" className="nav-logo">
-            <div className="nav-logo-icon" aria-hidden />
-            <div>
-              <div className="nav-logo-text">NUNDO</div>
-              <div className="nav-logo-tagline">Talents locaux, impact réel</div>
-            </div>
+            <img
+              src={logo}
+              alt="NUNDO - Talents locaux, impact réel"
+              className="nav-logo-img"
+              style={{ height: 110, display: "block" }}
+            />
           </Link>
 
           <nav className="nav-links">
@@ -94,6 +96,12 @@ export function MainLayout({ children }) {
           )}
           {!onAuthPage && isAuthenticated && (
             <div className="nav-actions">
+              {user?.role === "admin" && (
+                <Link to="/dashboard/admin" className="nav-dashboard-link nav-dashboard-link-admin">
+                  <Shield size={16} strokeWidth={2} />
+                  Admin
+                </Link>
+              )}
               {user?.role === "worker" && (
                 <Link to="/dashboard/worker" className="nav-dashboard-link">
                   <LayoutDashboard size={16} strokeWidth={2} />

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
-import { Trash2, Pencil, X } from "lucide-react";
+import { Trash2, Pencil, X, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/context/AuthContext.jsx";
 
 const API_BASE = "http://localhost:4000";
@@ -37,6 +37,11 @@ export function ChatPage() {
   const [workerFetchedAvatarUrl, setWorkerFetchedAvatarUrl] = useState(null);
   const [recruiterFetchedAvatarUrl, setRecruiterFetchedAvatarUrl] = useState(null);
   const [recruiterFetchedName, setRecruiterFetchedName] = useState(null);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [paymentIntentLoading, setPaymentIntentLoading] = useState(false);
+  const [paymentIntentError, setPaymentIntentError] = useState("");
+  const [deleteConfirmApp, setDeleteConfirmApp] = useState(null); // { id, jobId, label } ou null
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const role = user?.role === "worker" ? "worker" : "recruiter";
   const counterpartAvatarUrl =
@@ -362,18 +367,62 @@ export function ChatPage() {
     }
   }
 
-  async function acceptCandidate() {
-    if (!applicationId) return;
+  function openPaymentModal() {
+    setPaymentIntentError("");
+    setPaymentModalOpen(true);
+  }
+
+  async function confirmDeleteConversation() {
+    if (!deleteConfirmApp?.id) return;
+    setDeleteLoading(true);
     try {
-      setAccepting(true);
-      const res = await fetch(
-        `${API_BASE}/api/applications/${applicationId}/accept`,
-        { method: "POST", headers }
-      );
-      const data = await res.json();
-      if (res.ok) setApplication(data);
+      const res = await fetch(`${API_BASE}/api/applications/${deleteConfirmApp.id}`, {
+        method: "DELETE",
+        headers
+      });
+      if (res.status === 204 || res.ok) {
+        setConversations((prev) => prev.filter((a) => a.id !== deleteConfirmApp.id));
+        setDeleteConfirmApp(null);
+        if (applicationId === deleteConfirmApp.id) {
+          navigate("/chat");
+        }
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.message || "Impossible de supprimer la discussion.");
+      }
+    } catch {
+      alert("Erreur de connexion. Réessayez.");
     } finally {
-      setAccepting(false);
+      setDeleteLoading(false);
+    }
+  }
+
+  async function handlePayWithMobileMoney() {
+    if (!applicationId) return;
+    setPaymentIntentError("");
+    setPaymentIntentLoading(true);
+    try {
+      const payRes = await fetch(`${API_BASE}/api/payments/intent`, {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ applicationId })
+      });
+      const payData = await payRes.json();
+      if (!payRes.ok) {
+        setPaymentIntentError(payData.message || "Impossible de créer le paiement.");
+        return;
+      }
+      if (payData.paymentUrl) {
+        window.location.href = payData.paymentUrl;
+        return;
+      }
+      setPaymentIntentError(
+        "Lien de paiement non disponible. Configurez l'agrégateur (adullam.dev) côté serveur, ou réessayez plus tard."
+      );
+    } catch {
+      setPaymentIntentError("Erreur de connexion. Réessayez.");
+    } finally {
+      setPaymentIntentLoading(false);
     }
   }
 
@@ -424,7 +473,7 @@ export function ChatPage() {
           ) : (
             <ul className="chat-inbox-list">
               {conversations.map((app) => (
-                <li key={app.id}>
+                <li key={app.id} className="chat-inbox-item-row">
                   <button
                     type="button"
                     className="chat-inbox-item"
@@ -443,17 +492,69 @@ export function ChatPage() {
                         : `Mission #${app.jobId} · ${app.status === "accepted" ? "Accepté" : "En attente"}`}
                     </span>
                   </button>
+                  <button
+                    type="button"
+                    className="chat-inbox-item-delete"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteConfirmApp({
+                        id: app.id,
+                        jobId: app.jobId,
+                        label: role === "recruiter"
+                          ? (app.workerName || `Travailleur #${app.workerId}`)
+                          : (app.jobTitle || `Mission #${app.jobId}`)
+                      });
+                    }}
+                    title="Supprimer la discussion"
+                    aria-label="Supprimer la discussion"
+                  >
+                    <Trash2 size={18} />
+                  </button>
                 </li>
               ))}
             </ul>
           )}
         </div>
+
+        {deleteConfirmApp && (
+          <>
+            <div
+              className="chat-delete-overlay"
+              onClick={() => !deleteLoading && setDeleteConfirmApp(null)}
+              aria-hidden="true"
+            />
+            <div className="chat-delete-modal-box" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
+              <h2 id="delete-modal-title" className="chat-delete-modal-title">Supprimer cette discussion ?</h2>
+              <p className="chat-delete-modal-desc">
+                Tous les messages seront définitivement supprimés. Cette action est irréversible.
+              </p>
+              <div className="chat-delete-modal-footer">
+                <button
+                  type="button"
+                  className="chat-payment-modal-cancel"
+                  onClick={() => !deleteLoading && setDeleteConfirmApp(null)}
+                  disabled={deleteLoading}
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  className="chat-delete-modal-confirm"
+                  onClick={confirmDeleteConversation}
+                  disabled={deleteLoading}
+                >
+                  {deleteLoading ? "Suppression…" : "Supprimer"}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </section>
     );
   }
 
   return (
-    <section className="chat-shell">
+    <section className={`chat-shell${paymentModalOpen ? " chat-shell-payment-open" : ""}`}>
       <div className="chat-glass">
         <header className="chat-header">
           <button
@@ -497,25 +598,40 @@ export function ChatPage() {
               </div>
             </div>
           </div>
-          {role === "recruiter" && (
+          <div className="chat-header-actions">
+            {role === "recruiter" && (
+              <button
+                type="button"
+                className="chat-accept-button"
+                disabled={application?.status === "accepted"}
+                onClick={openPaymentModal}
+              >
+                {application?.status === "accepted"
+                  ? "Candidat accepté"
+                  : "Accepter ce candidat"}
+              </button>
+            )}
+            {role === "worker" && application?.status === "accepted" && (
+              <span className="chat-accept-button" style={{ opacity: 1, cursor: "default" }}>
+                ✓ Le recruteur vous a accepté
+              </span>
+            )}
             <button
               type="button"
-              className="chat-accept-button"
-              disabled={application?.status === "accepted" || accepting}
-              onClick={acceptCandidate}
+              className="chat-header-delete"
+              onClick={() =>
+                setDeleteConfirmApp({
+                  id: applicationId,
+                  jobId,
+                  label: counterpartName
+                })
+              }
+              title="Supprimer la discussion"
+              aria-label="Supprimer la discussion"
             >
-              {application?.status === "accepted"
-                ? "Candidat accepté"
-                : accepting
-                ? "Validation..."
-                : "Accepter ce candidat"}
+              <Trash2 size={18} />
             </button>
-          )}
-          {role === "worker" && application?.status === "accepted" && (
-            <span className="chat-accept-button" style={{ opacity: 1, cursor: "default" }}>
-              ✓ Le recruteur vous a accepté
-            </span>
-          )}
+          </div>
         </header>
 
         <div className="chat-messages">
@@ -570,7 +686,7 @@ export function ChatPage() {
                       </div>
                     </div>
                   ) : msg.type === "photo" ? (
-                    <div className="chat-bubble-attachment">
+                    <div className="chat-bubble-attachment chat-image-blurred">
                       {(msg.attachmentData ?? msg.attachment_data) ? (
                         <button
                           type="button"
@@ -684,6 +800,104 @@ export function ChatPage() {
           </button>
         </form>
       </div>
+
+      {paymentModalOpen && (
+        <>
+          <div
+            className="chat-payment-overlay"
+            onClick={() => { setPaymentModalOpen(false); setPaymentIntentError(""); }}
+            aria-hidden="true"
+          />
+          <div
+            className="chat-payment-modal-box"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="payment-modal-title"
+          >
+            <button
+              type="button"
+              className="chat-payment-modal-close"
+              onClick={() => { setPaymentModalOpen(false); setPaymentIntentError(""); }}
+              aria-label="Fermer"
+            >
+              <X size={18} />
+            </button>
+            <div className="chat-payment-modal-inner">
+              <h2 id="payment-modal-title" className="chat-payment-modal-title">
+                <ShieldCheck size={22} style={{ verticalAlign: "middle", marginRight: 8 }} />
+                Confirmer ce candidat par paiement sécurisé
+              </h2>
+              <div className="chat-payment-modal-desc">
+                <p>
+                  Pour valider ce placement, le montant (salaire 1er mois + commission NUNDO) sera déposé sur un <strong>compte marchand sécurisé</strong>.
+                </p>
+                <p>
+                  Vous pourrez récupérer les fonds si vous ne souhaitez plus ce candidat avant la fin de la période d'essai.
+                </p>
+                <p>
+                  En cliquant sur « Payer », vous serez redirigé vers votre <strong>Mobile Money</strong> (Orange Money, MTN ou Wave) pour effectuer le paiement. Le candidat ne sera marqué accepté qu'après réception du paiement.
+                </p>
+              </div>
+              {paymentIntentError && (
+                <p className="chat-payment-modal-error" role="alert">
+                  {paymentIntentError}
+                </p>
+              )}
+              <div className="chat-payment-modal-footer">
+                <button
+                  type="button"
+                  className="chat-payment-modal-cancel"
+                  onClick={() => setPaymentModalOpen(false)}
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  className="chat-payment-modal-pay"
+                  disabled={paymentIntentLoading}
+                  onClick={handlePayWithMobileMoney}
+                >
+                  {paymentIntentLoading ? "Redirection..." : "Payer avec Mobile Money"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {deleteConfirmApp && (
+        <>
+          <div
+            className="chat-delete-overlay"
+            onClick={() => !deleteLoading && setDeleteConfirmApp(null)}
+            aria-hidden="true"
+          />
+          <div className="chat-delete-modal-box" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
+            <h2 id="delete-modal-title" className="chat-delete-modal-title">Supprimer cette discussion ?</h2>
+            <p className="chat-delete-modal-desc">
+              Tous les messages seront définitivement supprimés. Cette action est irréversible.
+            </p>
+            <div className="chat-delete-modal-footer">
+              <button
+                type="button"
+                className="chat-payment-modal-cancel"
+                onClick={() => !deleteLoading && setDeleteConfirmApp(null)}
+                disabled={deleteLoading}
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                className="chat-delete-modal-confirm"
+                onClick={confirmDeleteConversation}
+                disabled={deleteLoading}
+              >
+                {deleteLoading ? "Suppression…" : "Supprimer"}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {lightboxImage && (
         <div

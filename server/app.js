@@ -8,6 +8,7 @@ import usersRoutes from "./routes/users.routes.js";
 import jobsRoutes from "./routes/jobs.routes.js";
 import applicationsRoutes from "./routes/applications.routes.js";
 import paymentsRoutes from "./routes/payments.routes.js";
+import adminRoutes from "./routes/admin.routes.js";
 
 import { errorMiddleware } from "./middlewares/error.middleware.js";
 import { authMiddleware } from "./middlewares/auth.middleware.js";
@@ -40,7 +41,8 @@ app.use("/api/users", authMiddleware, usersRoutes);
 // GET /api/jobs (public); POST protected inside jobs.routes
 app.use("/api/jobs", jobsRoutes);
 app.use("/api/applications", authMiddleware, applicationsRoutes);
-app.use("/api/payments", authMiddleware, paymentsRoutes);
+app.use("/api/payments", paymentsRoutes);
+app.use("/api/admin", adminRoutes);
 
 app.use(errorMiddleware);
 

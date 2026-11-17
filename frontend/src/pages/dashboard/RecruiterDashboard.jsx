@@ -6,8 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Briefcase, Users, CheckCircle2 } from "lucide-react";
-
-const API_BASE = "http://localhost:4000";
+import { API_BASE } from "@/lib/api.js";
 
 export function RecruiterDashboard() {
   const { user, token, saveAuth } = useAuth();
@@ -76,7 +75,7 @@ export function RecruiterDashboard() {
     if (!token) return;
     async function loadApplications() {
       try {
-        const res = await fetch("http://localhost:4000/api/applications", { headers });
+        const res = await fetch(`${API_BASE}/api/applications`, { headers });
         const data = await res.json();
         if (Array.isArray(data)) {
           setApplications(data);
@@ -91,12 +90,12 @@ export function RecruiterDashboard() {
   // Temps réel : nouvelle candidature reçue quand un travailleur postule
   useEffect(() => {
     if (!user || user?.role !== "recruiter") return;
-    const socket = io("http://localhost:4000", { transports: ["websocket"] });
+    const socket = io(API_BASE.replace(/\/$/, ""), { transports: ["websocket"] });
     socketRef.current = socket;
     socket.emit("join_recruiters");
     socket.on("new_application", async () => {
       try {
-        const res = await fetch("http://localhost:4000/api/applications", { headers });
+        const res = await fetch(`${API_BASE}/api/applications`, { headers });
         const data = await res.json();
         if (Array.isArray(data)) setApplications(data);
       } catch {
@@ -160,7 +159,7 @@ export function RecruiterDashboard() {
     }
     try {
       setPublishing(true);
-      const res = await fetch("http://localhost:4000/api/jobs", {
+      const res = await fetch(`${API_BASE}/api/jobs`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

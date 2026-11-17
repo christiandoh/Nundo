@@ -11,8 +11,7 @@ import {
 } from "recharts";
 import { Users, Shield, TrendingUp } from "lucide-react";
 import { useAuth } from "@/context/AuthContext.jsx";
-
-const API_BASE = "http://localhost:4000";
+import { API_BASE } from "@/lib/api.js";
 
 const ROLE_LABELS = {
   worker: "Travailleur",

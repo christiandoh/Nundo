@@ -4,6 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Phone, LockKeyhole, User } from "lucide-react";
 import { useAuth } from "@/context/AuthContext.jsx";
+import { API_BASE } from "@/lib/api.js";
+import logo from "@/pages/assets/logo2.png";
 
 export function RegisterPage() {
   const [phone, setPhone] = useState("");
@@ -23,7 +25,7 @@ export function RegisterPage() {
     setError("");
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:4000/api/auth/register", {
+      const res = await fetch(`${API_BASE}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -57,7 +59,7 @@ export function RegisterPage() {
     <div className="auth-shell">
       <div className="auth-glass">
         <div className="auth-logo-circle">
-          <span className="text-xs font-semibold tracking-[0.18em] uppercase">NUNDO</span>
+          <img src={logo} alt="NUNDO" className="auth-logo-img" />
         </div>
         <div className="auth-title">Créer un compte</div>
         <p className="auth-subtitle">

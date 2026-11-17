@@ -35,6 +35,32 @@ export function initSocket(server) {
       if (!applicationId || !message) return;
       ioInstance.to(`application:${applicationId}`).emit("new_message", message);
     });
+
+    // Appel vocal / vidéo (interview) : signalisation WebRTC
+    socket.on("call:start", ({ applicationId, type, from }) => {
+      if (!applicationId) return;
+      socket.to(`application:${applicationId}`).emit("call:start", { type, from });
+    });
+    socket.on("call:offer", ({ applicationId, sdp }) => {
+      if (!applicationId || !sdp) return;
+      socket.to(`application:${applicationId}`).emit("call:offer", { sdp });
+    });
+    socket.on("call:answer", ({ applicationId, sdp }) => {
+      if (!applicationId || !sdp) return;
+      socket.to(`application:${applicationId}`).emit("call:answer", { sdp });
+    });
+    socket.on("call:ice", ({ applicationId, candidate }) => {
+      if (!applicationId) return;
+      socket.to(`application:${applicationId}`).emit("call:ice", { candidate });
+    });
+    socket.on("call:end", ({ applicationId }) => {
+      if (!applicationId) return;
+      ioInstance.to(`application:${applicationId}`).emit("call:end", {});
+    });
+    socket.on("call:reject", ({ applicationId }) => {
+      if (!applicationId) return;
+      socket.to(`application:${applicationId}`).emit("call:reject", {});
+    });
   });
 
   return ioInstance;

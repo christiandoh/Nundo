@@ -1,6 +1,12 @@
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import heroImage from "@/pages/assets/image.png";
+import logoOrange from "@/pages/assets/orange.png";
+import logoMtn from "@/pages/assets/mtn.png";
+import logoWave from "@/pages/assets/wave.jpg";
+import logoMoov from "@/pages/assets/moov.png";
+import africaImage from "@/pages/assets/africa.jpg";
+import FlagForCoteDivoireIcon from "@/components/icons/FlagForCoteDivoireIcon.jsx";
 
 export function HomePage() {
   const navigate = useNavigate();
@@ -145,17 +151,30 @@ export function HomePage() {
           }}
         />
         <div style={{ position: "relative" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1.25rem" }}>
-            <div>
-              <div style={{ fontSize: 12, color: "#6b7280" }}>Recruteur</div>
-              <div style={{ fontWeight: 600, fontSize: 14 }}>Mission de chauffeur privé</div>
-            </div>
+          <div style={{ marginBottom: "1rem" }}>
+            <div style={{ fontSize: 12, color: "#6b7280" }}>Recruteur</div>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>Mission de chauffeur privé</div>
+          </div>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              marginBottom: "1.25rem"
+            }}
+          >
             <span
               style={{
-                padding: "0.25rem 0.7rem",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.35rem",
+                padding: "0.45rem 1rem",
                 borderRadius: 999,
-                fontSize: 11,
-                background: "rgba(15,23,42,0.06)"
+                fontSize: 12,
+                fontWeight: 500,
+                background: "linear-gradient(135deg, rgba(247,127,0,0.12), rgba(0,158,96,0.08))",
+                border: "1px solid rgba(148,163,184,0.25)",
+                color: "#0f172a",
+                letterSpacing: "0.02em"
               }}
             >
               Abobo · 250 000 CFA / mois
@@ -200,9 +219,21 @@ export function HomePage() {
                 <div style={{ fontSize: 11, opacity: 0.75 }}>Temps moyen de placement</div>
                 <div style={{ fontSize: 22, fontWeight: 600 }}>24 h</div>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10 }}>
-                <div style={{ fontSize: 11, opacity: 0.8 }}>Paiement</div>
-                <div style={{ fontSize: 11.5 }}>Orange Money · MTN · Wave</div>
+              <div style={{ marginTop: 10 }}>
+                <div style={{ fontSize: 11, opacity: 0.8, marginBottom: 6 }}>Paiement</div>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    flexWrap: "wrap"
+                  }}
+                >
+                  <img src={logoOrange} alt="Orange Money" style={{ height: 22, width: "auto", objectFit: "contain" }} />
+                  <img src={logoMtn} alt="MTN" style={{ height: 22, width: "auto", objectFit: "contain" }} />
+                  <img src={logoWave} alt="Wave" style={{ height: 22, width: "auto", objectFit: "contain" }} />
+                  <img src={logoMoov} alt="Moov" style={{ height: 22, width: "auto", objectFit: "contain" }} />
+                </div>
               </div>
             </div>
           </div>
@@ -247,6 +278,114 @@ export function HomePage() {
           sérénité via{" "}
           <span style={{ color: "#f77f00", fontWeight: 600 }}>Mobile Money</span>.
         </div>
+      </motion.section>
+
+      {/* Présence en Afrique de l'Ouest */}
+      <motion.section
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3, duration: 0.5 }}
+        style={{
+          marginTop: "4rem",
+          padding: "2.5rem 1.5rem",
+          borderRadius: 24,
+          background: "linear-gradient(160deg, rgba(247,127,0,0.06) 0%, rgba(0,158,96,0.06) 100%)",
+          border: "1px solid rgba(148,163,184,0.2)"
+        }}
+      >
+        <div style={{ textAlign: "center", marginBottom: "2rem" }}>
+          <h2
+            style={{
+              fontSize: "clamp(1.35rem, 2vw, 1.6rem)",
+              fontWeight: 700,
+              color: "#0f172a",
+              margin: 0
+            }}
+          >
+            Notre présence en Afrique de l&apos;Ouest
+          </h2>
+          <p style={{ marginTop: "0.5rem", fontSize: 14, color: "#64748b" }}>
+            Merci de nous faire confiance. Nous déployons notre activité pays par pays.
+          </p>
+        </div>
+
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            justifyContent: "center",
+            gap: "1.25rem",
+            alignItems: "stretch"
+          }}
+        >
+          {/* Côte d'Ivoire - active */}
+          <div
+            style={{
+              flex: "1 1 200px",
+              maxWidth: 280,
+              padding: "1.25rem 1.5rem",
+              borderRadius: 20,
+              background: "rgba(255,255,255,0.95)",
+              border: "1px solid rgba(148,163,184,0.3)",
+              boxShadow: "0 8px 24px rgba(15,23,42,0.08)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "0.75rem"
+            }}
+          >
+            <div
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 12,
+                overflow: "hidden",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 2px 8px rgba(15,23,42,0.15)"
+              }}
+            >
+              <FlagForCoteDivoireIcon size={56} />
+            </div>
+            <div style={{ fontWeight: 600, fontSize: 15, color: "#0f172a" }}>Côte d&apos;Ivoire</div>
+            <div style={{ fontSize: 12, color: "#009e60", fontWeight: 600 }}>Actif</div>
+          </div>
+
+          {/* Africa · Thank you */}
+          <div
+            style={{
+              flex: "1 1 200px",
+              maxWidth: 280,
+              padding: "1.25rem 1.5rem",
+              borderRadius: 20,
+              background: "rgba(255,255,255,0.95)",
+              border: "1px solid rgba(148,163,184,0.3)",
+              boxShadow: "0 8px 24px rgba(15,23,42,0.08)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "0.75rem"
+            }}
+          >
+            <img
+              src={africaImage}
+              alt="Afrique"
+              style={{
+                width: 72,
+                height: 72,
+                objectFit: "cover",
+                borderRadius: 16
+              }}
+            />
+            <div style={{ fontWeight: 600, fontSize: 15, color: "#0f172a" }}>Afrique</div>
+            <div style={{ fontSize: 14, color: "#009e60", fontWeight: 600 }}>Merci</div>
+          </div>
+        </div>
+
+        <p style={{ textAlign: "center", marginTop: "1.75rem", fontSize: 13, color: "#64748b" }}>
+          Merci de nous faire confiance. NUNDO connecte recruteurs et travailleurs en Côte d&apos;Ivoire, avec d&apos;autres pays à venir.
+        </p>
       </motion.section>
     </>
   );

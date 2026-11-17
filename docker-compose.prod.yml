@@ -1,0 +1,14 @@
+# NUNDO — Override production.
+# Utilise les images publiées sur GHCR au lieu de builder localement.
+#
+#   export NUNDO_SERVER_IMAGE=ghcr.io/<owner>/nundo-server:sha-abc1234
+#   export NUNDO_FRONTEND_IMAGE=ghcr.io/<owner>/nundo-frontend:sha-abc1234
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build --wait
+
+services:
+  server:
+    image: "${NUNDO_SERVER_IMAGE:?Définir NUNDO_SERVER_IMAGE (ex. ghcr.io/<owner>/nundo-server:sha-abc1234)}"
+
+  frontend:
+    image: "${NUNDO_FRONTEND_IMAGE:?Définir NUNDO_FRONTEND_IMAGE (ex. ghcr.io/<owner>/nundo-frontend:sha-abc1234)}"

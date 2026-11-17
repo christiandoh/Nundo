@@ -1,7 +1,26 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
+import { Briefcase, MapPin, Clock, Pencil, X, Camera, ChevronRight, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext.jsx";
+import { API_BASE } from "@/lib/api.js";
+
+const SKILLS = [
+  "Chauffeur", "Servante / Aide ménagère", "Cuisinier(ère)", "Vigile / Agent de sécurité",
+  "Jardinier(ère)", "Nourrice / Baby-sitter", "Plombier(ère)", "Électricien(ne)",
+  "Maçon(ne)", "Menuisier(ère)", "Mécanicien(ne)", "Coiffeur(se)", "Autre",
+];
+
+function getInitials(name) {
+  if (!name) return "?";
+  return name.trim().split(" ").slice(0, 2).map((n) => n[0]).join("").toUpperCase();
+}
+
+function profileCompleteness(profile) {
+  const fields = ["fullName", "mainSkill", "experienceYears", "city", "avatarUrl", "bio"];
+  const done = fields.filter((f) => profile[f] && String(profile[f]).trim() !== "").length;
+  return Math.round((done / fields.length) * 100);
+}
 
 export function WorkerDashboard() {
   const { user, token, saveAuth } = useAuth();
@@ -15,10 +34,13 @@ export function WorkerDashboard() {
     mainSkill: profile.mainSkill || "",
     experienceYears: profile.experienceYears || "",
     city: profile.city || "",
-    avatarUrl: profile.avatarUrl || ""
+    avatarUrl: profile.avatarUrl || "",
+    bio: profile.bio || "",
   });
   const [error, setError] = useState("");
   const socketRef = useRef(null);
+
+  const completeness = profileCompleteness(profile);
 
   useEffect(() => {
     if (!token || !user) return;
@@ -26,7 +48,7 @@ export function WorkerDashboard() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("http://localhost:4000/api/applications/me", { headers });
+        const res = await fetch(`${API_BASE}/api/applications/me`, { headers });
         const data = await res.json();
         if (!cancelled && Array.isArray(data)) setApplications(data);
       } catch {
@@ -38,13 +60,13 @@ export function WorkerDashboard() {
 
   useEffect(() => {
     if (!user?.id) return;
-    const socket = io("http://localhost:4000", { transports: ["websocket"] });
+    const socket = io(API_BASE.replace(/\/$/, ""), { transports: ["websocket"] });
     socketRef.current = socket;
     socket.emit("join_user", { userId: user.id });
     socket.on("application_accepted", async () => {
       try {
-        const res = await fetch("http://localhost:4000/api/applications/me", {
-          headers: { Authorization: `Bearer ${token}` }
+        const res = await fetch(`${API_BASE}/api/applications/me`, {
+          headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
         if (Array.isArray(data)) setApplications(data);
@@ -63,8 +85,7 @@ export function WorkerDashboard() {
     if (!file) return;
     const reader = new FileReader();
     reader.onloadend = () => {
-      const dataUrl = reader.result?.toString() || "";
-      setForm((f) => ({ ...f, avatarUrl: dataUrl }));
+      setForm((f) => ({ ...f, avatarUrl: reader.result?.toString() || "" }));
     };
     reader.readAsDataURL(file);
   }
@@ -75,22 +96,14 @@ export function WorkerDashboard() {
     setError("");
     try {
       setSaving(true);
-      const res = await fetch("http://localhost:4000/api/auth/profile", {
+      const res = await fetch(`${API_BASE}/api/auth/profile`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          id: user.id,
-          ...form
-        })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: user.id, ...form }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || "Impossible de mettre à jour le profil.");
-      }
-      const updatedUser = { ...(user || {}), profile: data.profile };
-      saveAuth(token, updatedUser);
+      if (!res.ok) throw new Error(data.message || "Impossible de mettre à jour le profil.");
+      saveAuth(token, { ...(user || {}), profile: data.profile });
       setEdit(false);
     } catch (err) {
       setError(err.message);
@@ -99,111 +112,132 @@ export function WorkerDashboard() {
     }
   }
 
+  const avatarSrc = form.avatarUrl || profile.avatarUrl;
+
   return (
     <div className="worker-shell">
       <div className="worker-glass">
-        {(form.avatarUrl || profile.avatarUrl) && (
-          <img
-            src={form.avatarUrl || profile.avatarUrl}
-            alt={profile.fullName || "Photo de profil"}
-            style={{
-              position: "absolute",
-              top: 18,
-              right: 20,
-              width: 150,
-              height: 150,
-              borderRadius: "999px",
-              objectFit: "cover",
-              border: "2px solid rgba(248, 250, 252,0.95)",
-              boxShadow: "0 18px 40px rgba(15,23,42,0.35)"
-            }}
-          />
-        )}
-        <p className="text-[0.7rem] uppercase tracking-[0.2em] text-slate-500 mb-1">
-          Profil travailleur
-        </p>
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
-          <div>
-            <h1 className="worker-header-name">
-              {profile.fullName || "Ton profil NUNDO"}
-            </h1>
-            <p className="worker-header-sub">
-              Ce profil sera visible par les recruteurs lorsque tu postuleras à une mission.
-            </p>
-            {profile.mainSkill && (
-              <div className="worker-badge-skill">
-                <span>✅</span>
-                <span>{profile.mainSkill}</span>
+
+        {/* ── Profile header ── */}
+        <div className="worker-profile-header">
+          <div className="worker-avatar-wrap">
+            {avatarSrc ? (
+              <img src={avatarSrc} alt={profile.fullName || "Avatar"} className="worker-avatar-img" />
+            ) : (
+              <div className="worker-avatar-placeholder">
+                {getInitials(profile.fullName)}
               </div>
             )}
           </div>
-          <div className="flex flex-col items-end gap-2">
-            <button
-              type="button"
-              className="btn-ghost"
-              style={{ fontSize: 11, padding: "0.45rem 1rem" }}
-              onClick={() => setEdit((v) => !v)}
-            >
-              {edit ? "Fermer l'édition" : "Modifier le profil"}
-            </button>
+
+          <div className="worker-profile-info">
+            <p className="worker-profile-kicker">Profil travailleur</p>
+            <h1 className="worker-header-name">
+              {profile.fullName || "Ton profil NUNDO"}
+            </h1>
+            <div className="worker-badges-row">
+              {profile.mainSkill && (
+                <span className="worker-badge worker-badge-skill">
+                  <Briefcase size={11} />
+                  {profile.mainSkill}
+                </span>
+              )}
+              {profile.city && (
+                <span className="worker-badge worker-badge-city">
+                  <MapPin size={11} />
+                  {profile.city}
+                </span>
+              )}
+            </div>
           </div>
+
+          <button
+            type="button"
+            className={`worker-edit-toggle ${edit ? "worker-edit-toggle-close" : ""}`}
+            onClick={() => setEdit((v) => !v)}
+          >
+            {edit ? <X size={14} /> : <Pencil size={14} />}
+            {edit ? "Fermer" : "Modifier"}
+          </button>
         </div>
-        <div className="grid gap-3 sm:grid-cols-3 text-sm mt-2">
-          <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
-            <p className="text-[0.7rem] font-medium uppercase tracking-[0.16em] text-slate-500">
-              Expérience
-            </p>
-            <p className="mt-1 font-semibold text-slate-900">
-              {profile.experienceYears ? `${profile.experienceYears} ans` : "À renseigner"}
-            </p>
+
+        <p className="worker-header-sub">
+          Ce profil sera visible par les recruteurs lorsque tu postuleras à une mission.
+        </p>
+
+        {profile.bio && (
+          <p className="worker-bio">{profile.bio}</p>
+        )}
+
+        {/* ── Stats row ── */}
+        <div className="worker-stats-row">
+          <div className="worker-stat-card">
+            <span className="worker-stat-icon-wrap">
+              <Clock size={15} />
+            </span>
+            <div>
+              <p className="worker-stat-label">Expérience</p>
+              <p className="worker-stat-value">
+                {profile.experienceYears ? `${profile.experienceYears} ans` : "—"}
+              </p>
+            </div>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
-            <p className="text-[0.7rem] font-medium uppercase tracking-[0.16em] text-slate-500">
-              Zone
-            </p>
-            <p className="mt-1 font-semibold text-slate-900">
-              {profile.city || "À renseigner"}
-            </p>
+
+          <div className="worker-stat-card">
+            <span className="worker-stat-icon-wrap">
+              <MapPin size={15} />
+            </span>
+            <div>
+              <p className="worker-stat-label">Zone</p>
+              <p className="worker-stat-value">{profile.city || "—"}</p>
+            </div>
           </div>
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2.5">
-            <p className="text-[0.7rem] font-medium uppercase tracking-[0.16em] text-emerald-700">
-              Statut du profil
-            </p>
-            <p className="mt-1 font-semibold text-emerald-800">
-              {profile.fullName && profile.mainSkill && profile.city
-                ? "Profil prêt à être présenté"
-                : "Complète ton profil pour inspirer confiance"}
-            </p>
+
+          <div className="worker-stat-card worker-stat-completion">
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="worker-completion-header">
+                <p className="worker-stat-label">Profil complété</p>
+                <p className="worker-completion-pct">{completeness}%</p>
+              </div>
+              <div className="worker-completion-track">
+                <div
+                  className="worker-completion-fill"
+                  style={{ width: `${completeness}%` }}
+                />
+              </div>
+              <p className="worker-completion-hint">
+                {completeness === 100 ? (
+                  <><CheckCircle2 size={11} style={{ display: "inline", marginRight: 4, color: "#047857" }} />Profil prêt à être présenté</>
+                ) : (
+                  "Complète ton profil pour inspirer confiance"
+                )}
+              </p>
+            </div>
           </div>
         </div>
 
+        {/* ── Applications ── */}
         {applications.length > 0 && (
-          <div className="mt-6">
-            <p className="text-[0.7rem] uppercase tracking-[0.18em] text-slate-500 mb-2">
-              Mes candidatures
-            </p>
-            <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
+          <div className="worker-applications">
+            <p className="worker-applications-title">Mes candidatures</p>
+            <div className="worker-applications-list">
               {applications.map((app) => (
-                <div
-                  key={app.id}
-                  className="flex items-center justify-between gap-3 px-3 py-2.5 border-b border-slate-100 last:border-0"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-slate-900 truncate">
+                <div key={app.id} className="worker-app-row">
+                  <div className="worker-app-info">
+                    <p className="worker-app-job">
                       {app.jobTitle || `Mission #${app.jobId}`}
                     </p>
-                    <p className="text-xs text-slate-500">
+                    <span className={`worker-app-status ${app.status === "accepted" ? "accepted" : "pending"}`}>
                       {app.status === "accepted" ? "Acceptée" : "En attente"}
-                    </p>
+                    </span>
                   </div>
                   <button
                     type="button"
-                    className="btn-ghost text-xs py-1.5 px-2"
-                    onClick={() =>
-                      navigate(`/chat?applicationId=${app.id}&jobId=${app.jobId}`)
-                    }
+                    className="worker-app-chat-btn"
+                    onClick={() => navigate(`/chat?applicationId=${app.id}&jobId=${app.jobId}`)}
                   >
-                    {app.status === "accepted" ? "Voir la conversation" : "Contacter"}
+                    {app.status === "accepted" ? "Conversation" : "Contacter"}
+                    <ChevronRight size={13} />
                   </button>
                 </div>
               ))}
@@ -211,68 +245,96 @@ export function WorkerDashboard() {
           </div>
         )}
 
+        {/* ── Edit form ── */}
         {edit && (
           <form onSubmit={handleSave} className="worker-edit-card">
-            <div className="worker-edit-title">Mettre à jour ton profil</div>
-            <div className="grid gap-3 sm:grid-cols-2 text-sm">
-              <div>
-                <span className="worker-edit-label">Nom complet</span>
+            <div className="worker-edit-title">
+              <Pencil size={14} />
+              Mettre à jour ton profil
+            </div>
+
+            <div className="worker-edit-grid">
+              {/* Full name */}
+              <div className="worker-edit-field">
+                <label className="worker-edit-label">Nom complet</label>
                 <input
                   className="worker-edit-input"
+                  placeholder="Ex : Konan Aya Marie"
                   value={form.fullName}
                   onChange={(e) => setForm((f) => ({ ...f, fullName: e.target.value }))}
                 />
               </div>
-              <div>
-                <span className="worker-edit-label">Métier principal</span>
-                <input
-                  className="worker-edit-input"
+
+              {/* Skill */}
+              <div className="worker-edit-field">
+                <label className="worker-edit-label">Métier principal</label>
+                <select
+                  className="worker-edit-input worker-edit-select"
                   value={form.mainSkill}
                   onChange={(e) => setForm((f) => ({ ...f, mainSkill: e.target.value }))}
-                />
+                >
+                  <option value="">-- Choisir --</option>
+                  {SKILLS.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                  {form.mainSkill && !SKILLS.includes(form.mainSkill) && (
+                    <option value={form.mainSkill}>{form.mainSkill}</option>
+                  )}
+                </select>
               </div>
-              <div>
-                <span className="worker-edit-label">Années d&apos;expérience</span>
+
+              {/* Experience */}
+              <div className="worker-edit-field">
+                <label className="worker-edit-label">Années d&apos;expérience</label>
                 <input
                   className="worker-edit-input"
+                  type="number"
+                  min="0"
+                  max="50"
+                  placeholder="Ex : 3"
                   value={form.experienceYears}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, experienceYears: e.target.value }))
-                  }
+                  onChange={(e) => setForm((f) => ({ ...f, experienceYears: e.target.value }))}
                 />
               </div>
-              <div>
-                <span className="worker-edit-label">Ville / commune</span>
+
+              {/* City */}
+              <div className="worker-edit-field">
+                <label className="worker-edit-label">Ville / commune</label>
                 <input
                   className="worker-edit-input"
+                  placeholder="Ex : Abobo, Cocody, Yopougon…"
                   value={form.city}
                   onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
                 />
               </div>
-              <div className="sm:col-span-2">
-                <span className="worker-edit-label">Photo de profil</span>
-                <div className="flex items-center gap-2">
-                  {(form.avatarUrl || profile.avatarUrl) && (
-                    <img
-                      src={form.avatarUrl || profile.avatarUrl}
-                      alt="Prévisualisation"
-                      style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: "999px",
-                        objectFit: "cover",
-                        border: "2px solid rgba(148,163,184,0.8)"
-                      }}
-                    />
-                  )}
-                  <label
-                    className="btn-ghost"
-                    style={{
-                      fontSize: 11,
-                      padding: "0.4rem 0.9rem",
-                      cursor: "pointer"
-                    }}
-                  >
+
+              {/* Bio */}
+              <div className="worker-edit-field worker-edit-field-full">
+                <label className="worker-edit-label">À propos de toi</label>
+                <textarea
+                  className="worker-edit-input worker-edit-textarea"
+                  placeholder="Décris ton parcours, tes qualités, ta disponibilité…"
+                  rows={3}
+                  value={form.bio}
+                  onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))}
+                />
+              </div>
+
+              {/* Avatar */}
+              <div className="worker-edit-field worker-edit-field-full">
+                <label className="worker-edit-label">Photo de profil</label>
+                <div className="worker-avatar-upload-row">
+                  <div className="worker-avatar-preview-wrap">
+                    {avatarSrc ? (
+                      <img src={avatarSrc} alt="Prévisualisation" className="worker-avatar-preview" />
+                    ) : (
+                      <div className="worker-avatar-preview-placeholder">
+                        {getInitials(form.fullName)}
+                      </div>
+                    )}
+                  </div>
+                  <label className="worker-avatar-upload-btn">
+                    <Camera size={13} />
                     Choisir une photo
                     <input
                       type="file"
@@ -282,17 +344,26 @@ export function WorkerDashboard() {
                       onChange={handleAvatarChange}
                     />
                   </label>
+                  {avatarSrc && (
+                    <button
+                      type="button"
+                      className="worker-avatar-remove-btn"
+                      onClick={() => setForm((f) => ({ ...f, avatarUrl: "" }))}
+                    >
+                      Supprimer
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
-            {error && (
-              <p className="text-[0.7rem] text-red-500 mt-2">{error}</p>
-            )}
-            <div className="flex justify-end gap-2 mt-3">
+
+            {error && <p className="worker-edit-error">{error}</p>}
+
+            <div className="worker-edit-actions">
               <button
                 type="button"
                 className="btn-ghost"
-                style={{ fontSize: 11, padding: "0.4rem 1rem" }}
+                style={{ fontSize: 12, padding: "0.45rem 1.1rem" }}
                 onClick={() => setEdit(false)}
               >
                 Annuler
@@ -300,10 +371,10 @@ export function WorkerDashboard() {
               <button
                 type="submit"
                 className="btn-primary"
-                style={{ fontSize: 11, padding: "0.4rem 1.2rem" }}
+                style={{ fontSize: 12, padding: "0.45rem 1.3rem" }}
                 disabled={saving}
               >
-                {saving ? "Enregistrement..." : "Enregistrer"}
+                {saving ? "Enregistrement…" : "Enregistrer"}
               </button>
             </div>
           </form>
@@ -312,4 +383,3 @@ export function WorkerDashboard() {
     </div>
   );
 }
-

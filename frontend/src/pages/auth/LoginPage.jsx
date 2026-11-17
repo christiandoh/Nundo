@@ -4,6 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { User, LockKeyhole } from "lucide-react";
 import { useAuth } from "@/context/AuthContext.jsx";
+import { API_BASE } from "@/lib/api.js";
+import logo from "@/pages/assets/logo2.png";
 
 export function LoginPage() {
   const [phone, setPhone] = useState("");
@@ -18,7 +20,7 @@ export function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:4000/api/auth/login", {
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone, password })
@@ -43,7 +45,7 @@ export function LoginPage() {
     <div className="auth-shell">
       <div className="auth-glass">
         <div className="auth-logo-circle">
-          <span className="text-xs font-semibold tracking-[0.18em] uppercase">NUNDO</span>
+          <img src={logo} alt="NUNDO" className="auth-logo-img" />
         </div>
         <div className="auth-title">Connexion</div>
         <p className="auth-subtitle">
@@ -81,7 +83,7 @@ export function LoginPage() {
               <input type="checkbox" id="remember" className="h-3 w-3 rounded border-slate-500" />
               <span className="text-[0.7rem] cursor-pointer">Se souvenir de moi</span>
             </div>
-            <button type="button" className="text-[0.7rem] text-sky-400">
+            <button type="button" className="auth-link-forgot">
               Mot de passe oublié ?
             </button>
           </div>

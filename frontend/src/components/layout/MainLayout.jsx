@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { MessageCircle, LayoutDashboard, LogOut, Briefcase, Mail, Shield } from "lucide-react";
+import { MessageCircle, LayoutDashboard, LogOut, Briefcase, Mail, Shield, Users } from "lucide-react";
 import { useAuth } from "@/context/AuthContext.jsx";
+import { API_BASE } from "@/lib/api.js";
 import logo from "@/pages/assets/logo2.png";
-
-const API_BASE = "http://localhost:4000";
 const pageVariants = {
   initial: { opacity: 0, y: 10 },
   animate: { opacity: 1, y: 0 },
@@ -82,6 +81,12 @@ export function MainLayout({ children }) {
               </span>
               <span>Messages</span>
             </button>
+            {user?.role === "recruiter" && (
+              <Link to="/dashboard/candidates" className="nav-link">
+                <Users size={16} strokeWidth={2} />
+                Candidats
+              </Link>
+            )}
           </nav>
 
           {!onAuthPage && !isAuthenticated && (

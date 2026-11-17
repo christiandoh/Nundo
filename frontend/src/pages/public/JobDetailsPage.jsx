@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext.jsx";
 import { Users, X } from "lucide-react";
+import { API_BASE } from "@/lib/api.js";
 
-const API_BASE = "http://localhost:4000";
 const MAX_POSTULANTS = 10;
 
 export function JobDetailsPage() {

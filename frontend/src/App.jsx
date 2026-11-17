@@ -11,6 +11,7 @@ import { LoginPage } from "./pages/auth/LoginPage.jsx";
 import { RegisterPage } from "./pages/auth/RegisterPage.jsx";
 import { WorkerDashboard } from "./pages/dashboard/WorkerDashboard.jsx";
 import { RecruiterDashboard } from "./pages/dashboard/RecruiterDashboard.jsx";
+import { CandidatesPage } from "./pages/dashboard/CandidatesPage.jsx";
 import { AdminDashboard } from "./pages/dashboard/AdminDashboard.jsx";
 import { ChatPage } from "./pages/dashboard/ChatPage.jsx";
 import { useAuth } from "./context/AuthContext.jsx";
@@ -60,6 +61,14 @@ export default function App() {
             element={
               <PrivateRoute roles={["recruiter"]}>
                 <RecruiterDashboard />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/dashboard/candidates"
+            element={
+              <PrivateRoute roles={["recruiter"]}>
+                <CandidatesPage />
               </PrivateRoute>
             }
           />

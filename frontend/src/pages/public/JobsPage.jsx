@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { API_BASE } from "@/lib/api.js";
 
 export function JobsPage() {
   const [jobs, setJobs] = useState([]);
@@ -9,7 +10,7 @@ export function JobsPage() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch("http://localhost:4000/api/jobs");
+        const res = await fetch(`${API_BASE}/api/jobs`);
         const data = await res.json();
         if (Array.isArray(data)) {
           setJobs(data);

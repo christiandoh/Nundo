@@ -61,6 +61,24 @@ export function getUsersForAdmin() {
   }));
 }
 
+/** Liste des travailleurs (profil public) pour les recruteurs quand DB non utilisée */
+export function getWorkersMem() {
+  return usersMem
+    .filter((u) => u.role === "worker")
+    .map((u) => {
+      const profile = u.profile || {};
+      return {
+        id: u.id,
+        fullName: profile.fullName ?? "",
+        mainSkill: profile.mainSkill ?? "",
+        experienceYears: profile.experienceYears ?? "",
+        city: profile.city ?? "",
+        avatarUrl: profile.avatarUrl ?? null,
+        createdAt: u.created_at || null
+      };
+    });
+}
+
 router.post("/register", async (req, res, next) => {
   try {
     const {

@@ -1,0 +1,144 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  frontend:
+    name: Frontend — lint & build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+  server:
+    name: Server — syntax & smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Syntax check (tous les fichiers JS)
+        run: |
+          find . -path ./node_modules -prune -o -name '*.js' -print0 \
+            | xargs -0 -n1 node --check
+
+      - name: Smoke test (mode mémoire, sans base)
+        env:
+          PORT: "4100"
+        run: |
+          node server.js &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+
+          curl -fsS --retry 20 --retry-connrefused --retry-delay 1 \
+            http://127.0.0.1:4100/health -o /tmp/health.json
+
+          cat /tmp/health.json
+          node -e '
+            const health = require("/tmp/health.json");
+            const ok = health.status === "ok"
+              && health.service === "nundo-backend"
+              && health.db === "not-configured";
+            if (!ok) {
+              console.error("Health inattendu:", health);
+              process.exit(1);
+            }
+          '
+
+  docker:
+    name: Docker — build & E2E
+    runs-on: ubuntu-latest
+    needs: [frontend, server]
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Valider la config Compose
+        run: docker compose config -q
+
+      - name: Démarrer la stack
+        run: docker compose up -d --build --wait --wait-timeout 240
+
+      - name: API via nginx (/api/jobs)
+        run: |
+          curl -fsS --retry 30 --retry-connrefused --retry-delay 2 \
+            http://127.0.0.1:3000/api/jobs -o /tmp/jobs.json
+          node -e '
+            const jobs = require("/tmp/jobs.json");
+            if (!Array.isArray(jobs)) {
+              console.error("Réponse /api/jobs inattendue:", jobs);
+              process.exit(1);
+            }
+            console.log(jobs.length + " annonce(s) renvoyée(s)");
+          '
+
+      - name: Health backend (PostgreSQL connecté)
+        run: |
+          docker compose exec -T server node -e "
+            fetch('http://127.0.0.1:4000/health')
+              .then((r) => r.json())
+              .then((h) => {
+                console.log(h);
+                if (h.status !== 'ok' || h.db !== 'ok') process.exit(1);
+              })
+              .catch((e) => { console.error(e); process.exit(1); });
+          "
+
+      - name: Frontend servi par nginx
+        run: curl -fsS http://127.0.0.1:3000/ | grep -q '<div id="root">'
+
+      - name: Logs (échec)
+        if: failure()
+        run: docker compose logs --no-color --tail=200
+
+      - name: Arrêt de la stack
+        if: always()
+        run: docker compose down -v

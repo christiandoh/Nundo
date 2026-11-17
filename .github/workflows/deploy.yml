@@ -1,0 +1,71 @@
+name: Deploy — Production (VPS)
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Tag d'image à déployer (sha-abc1234, 1.2.3 ou latest)"
+        required: true
+        default: latest
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Déploiement ${{ inputs.image_tag }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_PORT: ${{ secrets.DEPLOY_PORT || '22' }}
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/nundo' }}
+      IMAGE_TAG: ${{ inputs.image_tag }}
+      REPOSITORY: ${{ github.repository_owner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Vérifier la configuration
+        run: |
+          missing=""
+          [ -z "$DEPLOY_HOST" ] && missing="$missing DEPLOY_HOST"
+          [ -z "$DEPLOY_USER" ] && missing="$missing DEPLOY_USER"
+          [ -z "$DEPLOY_SSH_KEY" ] && missing="$missing DEPLOY_SSH_KEY"
+          if [ -n "$missing" ]; then
+            echo "::error::Secrets manquants :$missing"
+            exit 1
+          fi
+
+      - name: Préparer SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "$DEPLOY_PORT" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Préparer le répertoire distant
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -p "$DEPLOY_PORT" \
+            "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$DEPLOY_PATH'"
+
+      - name: Copier les fichiers Compose
+        run: |
+          scp -i ~/.ssh/id_ed25519 -P "$DEPLOY_PORT" \
+            docker-compose.yml docker-compose.prod.yml \
+            "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
+
+      - name: Déployer et vérifier
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -p "$DEPLOY_PORT" \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "DEPLOY_PATH='$DEPLOY_PATH' IMAGE_TAG='$IMAGE_TAG' REPOSITORY='$REPOSITORY' bash -s" \
+            < .github/scripts/deploy-remote.sh

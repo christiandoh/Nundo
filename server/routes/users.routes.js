@@ -1,7 +1,44 @@
 import { Router } from "express";
 import { pool } from "../config/db.config.js";
+import { getWorkersMem } from "./auth.routes.js";
 
 const router = Router();
+
+// Liste de tous les travailleurs inscrits (recruteurs et admin uniquement)
+router.get("/workers", async (req, res, next) => {
+  try {
+    const { role } = req.user || {};
+    if (role !== "recruiter" && role !== "admin") {
+      return res.status(403).json({ message: "Réservé aux recruteurs." });
+    }
+    if (pool) {
+      const result = await pool.query(
+        `SELECT id, profile, created_at
+         FROM users
+         WHERE role = 'worker'
+         ORDER BY created_at DESC NULLS LAST`
+      );
+      const workers = result.rows.map((row) => {
+        const profile = typeof row.profile === "object"
+          ? row.profile
+          : (row.profile && JSON.parse(row.profile)) || {};
+        return {
+          id: row.id,
+          fullName: profile.fullName ?? "",
+          mainSkill: profile.mainSkill ?? "",
+          experienceYears: profile.experienceYears ?? "",
+          city: profile.city ?? "",
+          avatarUrl: profile.avatarUrl ?? null,
+          createdAt: row.created_at ? new Date(row.created_at).toISOString() : null
+        };
+      });
+      return res.json(workers);
+    }
+    return res.json(getWorkersMem());
+  } catch (err) {
+    next(err);
+  }
+});
 
 router.get("/", async (req, res, next) => {
   try {

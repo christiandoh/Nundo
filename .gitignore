@@ -3,6 +3,7 @@ frontend/node_modules/
 server/node_modules/
 .env
 .env.*
+!server/.env.example
 server/.env
 *.log
 dist/

@@ -32,7 +32,7 @@ jobs:
       REPOSITORY: ${{ github.repository_owner }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Vérifier la configuration
         run: |
